@@ -1,5 +1,5 @@
 - hosts: wp-servers
-  remote_user: root
+  remote_user: ubuntu
   gather_facts: yes
   become: true
   roles:

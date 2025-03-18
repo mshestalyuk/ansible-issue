@@ -1,8 +1,8 @@
 #wp-servers
-wordpress01 ansible_host=2001:3003:2003:2:1::1 node_name=wordpress01
+wordpress01 ansible_host=13.60.79.3 node_name=wordpress01
 
 #databases
-percona01 ansible_host=2001:2003:2003:2:50::1 node_name=percona01
+percona01 ansible_host=13.51.86.70 node_name=percona01
 
 #groups
 [wp-servers]
