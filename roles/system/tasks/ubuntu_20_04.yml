@@ -1,0 +1,111 @@
+- name: System | Install CA
+  apt: name={{ item }} state=present
+  with_items:
+    - ca-certificates
+
+- name: System | Install APT-packages
+  apt: name={{ item }} state=present update_cache=yes cache_valid_time=3600
+  with_items:
+    - sudo
+    - zsh
+    - figlet
+    - fortune
+    - python-apt
+    - htop
+    - unzip
+    - curl
+    - apt-transport-https
+    - build-essential
+    - git
+    - wget
+    - net-tools
+    - vim
+
+- name: System | Remove postfix package
+  apt:
+    name: postfix
+    state: absent
+
+- name: System | create path sshd
+  file:
+    path: /var/run/sshd
+    state: directory
+
+- name: System | Ensure localisation files for '{{ config_system_locale }}' are available
+  locale_gen:
+    name: "{{ config_system_locale }}"
+    state: present
+
+- name: System | Ensure localisation files for '{{ config_system_language }}' are available
+  locale_gen:
+    name: "{{ config_system_language }}"
+    state: present
+
+- name: System | Get current locale and language configuration
+  command: localectl status
+  register: locale_status
+  changed_when: false
+
+- name: System | Parse 'LANG' from current locale and language configuration
+  set_fact:
+    locale_lang: "{{ locale_status.stdout | regex_search('LANG=([^\n]+)', '\\1') | first }}"
+
+- name: System | Parse 'LANGUAGE' from current locale and language configuration
+  set_fact:
+    locale_language: "{{ locale_status.stdout | regex_search('LANGUAGE=([^\n]+)', '\\1') | default([locale_lang], true) | first }}"
+
+- name: System | Configure locale to '{{ config_system_locale }}' and language to '{{ config_system_language }}'
+  command: localectl set-locale LANG={{ config_system_locale }} LANGUAGE={{ config_system_language }}
+  changed_when: locale_lang != config_system_locale or locale_language != config_system_language
+
+- name: System | Set timezone to Europe/Kiev
+  community.general.timezone:
+    name: Europe/Kiev
+
+- name:  System | Create Nginx logrotate config
+  template: src=templates/log.j2 dest=/etc/logrotate.d/logrotate_nginx_backend.cfg
+
+- name: System | chek path journal
+  stat:
+    path: "/var/log/journal"
+  register: file_path
+
+- name: System | create path journal
+  file:
+    path: /var/log/journal
+    state: directory
+  when: file_path.stat.exists == False
+
+- name: System | Allow 'sudo' group to have passwordless sudo
+  lineinfile:
+    dest: /etc/systemd/journald.conf
+    state: present
+    regexp: '#SystemMaxUse='
+    line: 'SystemMaxUse=10M'
+  when: file_path.stat.exists == False
+
+- name: System | restart service.journal
+  service:
+    name: systemd-journald
+    state: restarted
+  when: file_path.stat.exists == False
+
+- name: System | Copy LDAPconfig for CMS
+  ansible.builtin.copy:
+    src: files/ldap.conf
+    dest: /etc/ldap/ldap.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Add 10-hostname script
+  copy:
+    src: "{{ item }}"
+    dest: "/etc/update-motd.d/{{ item }}"
+    force: yes
+    mode: a+x
+  with_items:
+    - 10-hostname
+    - 20-sysinfo
+    - 35-diskspace
+    - 40-services

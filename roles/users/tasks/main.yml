@@ -1,0 +1,121 @@
+- name: Starting CI Process (Users)
+  block:
+
+    - name: Add the user
+      ansible.builtin.user:
+        name: "{{ item.user }}"
+        shell: "{{ item.ssh | default('/bin/bash') }}"
+        groups: sudo
+        append: true
+      with_items:
+        - "{{ users }}"
+
+    - name: Set authorized key
+      ansible.posix.authorized_key:
+        user: "{{ item.user }}"
+        state: present
+        key: "{{ item.sshkey }}"
+      with_items:
+        - "{{ users }}"
+
+    - name: Create a ssh config
+      ansible.builtin.copy:
+        src: config
+        dest: "/root/.ssh/config"
+        mode: '0600'
+
+    - name: Ansible delete multiple file example
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      with_items:
+        - /etc/update-motd.d/10-uname
+        - /etc/motd
+        - /etc/update-motd.d/00-header
+        - /etc/update-motd.d/10-help-text
+        - /etc/update-motd.d/50-motd-news
+        - /etc/update-motd.d/91-release-upgrade
+        - /etc/update-motd.d/50-landscape-sysinfo
+        - /etc/update-motd.d/85-fwupd
+        - /etc/update-motd.d/88-esm-announce
+        - /etc/update-motd.d/90-updates-available
+        - /etc/update-motd.d/91-contract-ua-esm-status
+        - /etc/update-motd.d/92-unattended-upgrades
+        - /etc/update-motd.d/95-hwe-eol
+        - /etc/update-motd.d/97-overlayroot
+        - /etc/update-motd.d/98-fsck-at-reboot
+        - /etc/update-motd.d/98-reboot-required
+
+    - name: Ensure group "sftp_users" exists
+      ansible.builtin.group:
+        name: sftp_users
+        state: present
+
+    - name: Add the user
+      ansible.builtin.user:
+        name: "{{ item.user_name }}"
+        shell: "{{ item.user_shell | default('/bin/bash') }}"
+        groups: www-data,sftp_users
+        home: "/var/www/{{ item.user_name }}/"
+        password: "{{ item.user_password_open | password_hash('sha512') }}"
+        update_password: always
+        expires: -1
+        append: true
+      with_items:
+        - "{{ project_users }}"
+
+    - name: User | SET sftp User Home Dir
+      ansible.builtin.file:
+        path: /var/www/{{ item.user_name }}/
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      with_items: "{{ project_users }}"
+
+    - name: ProFTP | Remove old string
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        line: 'Subsystem	sftp	/usr/lib/openssh/sftp-server'
+        state: absent
+
+    - name: ProFTP | Add options to sshd_config
+      ansible.builtin.blockinfile:
+        dest: /etc/ssh/sshd_config
+        block: |
+          Subsystem sftp internal-sftp
+          # Jail users to home directory
+          Match Group sftp_users
+            X11Forwarding no
+            AllowTcpForwarding no
+            ChrootDirectory %h
+            ForceCommand internal-sftp
+        state: present
+
+    - name: ProFTP | Comment a string
+      ansible.builtin.replace:
+        dest: /etc/ssh/sshd_config
+        regexp: '^Subsystem sftp /usr/'
+        replace: "#Subsystem sftp /usr/"
+
+    - name: ProFTP | Comment a string
+      ansible.builtin.replace:
+        dest: /etc/ssh/sshd_config
+        regexp: '^UseDNS no'
+        replace: "#UseDNS no"
+
+    - name: Allow 'sudo' group to have passwordless sudo
+      ansible.builtin.lineinfile:
+        dest: /etc/sudoers
+        state: present
+        regexp: '^%sudo'
+        line: '%sudo    ALL=NOPASSWD: ALL'
+        validate: 'visudo -cf %s'
+
+    - name: User | SET sftp User Home Dir
+      ansible.builtin.file:
+        path: /root/.ssh
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'

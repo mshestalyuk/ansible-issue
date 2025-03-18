@@ -1,0 +1,10 @@
+---
+users:
+  
+  - user: imposter
+    sshkey: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILPHU6P1tKbJU88EMq+wVkXp+IOmQuaVAUS5SXQ8DcWk'
+    shell:  '/bin/zsh'
+
+root:
+  - user: root
+    sshkey: 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPLtDjjA6FEPR+JBjaaL0+L9BBop4GbXNyOfTvknn+QC'

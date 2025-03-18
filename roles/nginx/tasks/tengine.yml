@@ -1,0 +1,160 @@
+- name: TENGINE | Upload lock nginx .deb
+  ansible.builtin.copy:
+    src: tengine-config/nginx
+    dest: /etc/apt/preferences.d/nginx
+    mode: "0644"
+  become: true
+
+- name: TENGINE | Install dev library
+  ansible.builtin.apt:
+    name: "{{ item }}"
+    update_cache: true
+    state: present
+  with_items:
+    - libpcre3
+    - libpcre3-dev
+    - build-essential
+    - libcurl4-gnutls-dev
+    - libxml2-dev
+    - libssl-dev
+    - zlib1g
+    - zlib1g-dev
+    - libxml2-dev
+    - libxslt1-dev
+    - libgd-dev
+    - libgeoip-dev
+
+
+- name: Ensure group nginx exists
+  ansible.builtin.group:
+    name: nginx
+    state: present
+
+- name: Add system user nginx
+  ansible.builtin.user:
+    name: nginx
+    system: true
+    home: /var/cache/nginx
+    shell: /sbin/nologin
+    groups: nginx
+    append: true
+    state: present
+
+
+- name: TENGINE | Create tmp  TENGINE directory
+  ansible.builtin.file:
+    path: /tmp/tengine
+    state: directory
+    mode: '0775'
+
+- name: TENGINE | Upload tengine-2.3.3.tar.gz
+  ansible.builtin.copy:
+    src: tengine-config/tengine-2.3.3.tar.gz
+    dest: /tmp/tengine-2.3.3.tar.gz
+    mode: "0644"
+  become: true
+
+- name: TENGINE | Upload headers-more-nginx-module-0.33.tar.gz
+  ansible.builtin.copy:
+    src: tengine-config/headers-more-nginx-module-0.33.tar.gz
+    dest: /tmp/headers-more-nginx-module-0.33.tar.gz
+    mode: "0644"
+  become: true
+  register: copy_result
+
+
+- name: TENGINE | Extract TENGINE   tengine-2.3.3.tar.gz into /tmp/tengine
+  ansible.builtin.unarchive:
+    src: /tmp/tengine-2.3.3.tar.gz
+    dest: /tmp/tengine
+    remote_src: true
+    extra_opts: [--strip-components=1]
+
+- name: TENGINE | Extract TENGINE headers-more-nginx-module-0.33.tar.gz into /tmp/tengine
+  ansible.builtin.unarchive:
+    src: /tmp/headers-more-nginx-module-0.33.tar.gz
+    dest: /tmp/tengine/modules
+    remote_src: true
+
+- name: TENGINE |  Create nginx config files
+  ansible.builtin.template:
+    src: tengine-config/nginx_version_set.j2
+    dest: /tmp/tengine/src/core/nginx.h
+    mode: "0644"
+
+- name: TENGINE |  Create nginx config files
+  ansible.builtin.copy:
+    src: tengine-config/ngx_http_special_response.c
+    dest: /tmp/tengine/src/http/ngx_http_special_response.c
+    mode: "0644"
+
+- name: TENGINE | Configure
+  shell: ./configure \
+        --prefix=/etc/nginx \
+        --sbin-path=/usr/sbin/nginx \
+        --modules-path=/usr/lib/nginx/modules \
+        --conf-path=/etc/nginx/nginx.conf  \
+        --error-log-path=/var/log/nginx/error.log \
+        --http-log-path=/var/log/nginx/access.log \
+        --pid-path=/var/run/nginx.pid \
+        --lock-path=/var/run/nginx.lock \
+        --http-client-body-temp-path=/var/cache/nginx/client_temp \
+        --http-proxy-temp-path=/var/cache/nginx/proxy_temp \
+        --http-fastcgi-temp-path=/var/cache/nginx/fastcgi_temp \
+        --http-uwsgi-temp-path=/var/cache/nginx/uwsgi_temp  \
+        --http-scgi-temp-path=/var/cache/nginx/scgi_temp \
+        --user=nginx \
+        --group=nginx \
+        --with-http_ssl_module  \
+        --with-http_realip_module \
+        --with-http_addition_module \
+        --with-http_sub_module  \
+        --with-http_dav_module  \
+        --with-http_flv_module  \
+        --with-http_mp4_module  \
+        --with-http_gunzip_module  \
+        --with-http_gzip_static_module \
+        --with-http_random_index_module \
+        --with-http_secure_link_module  \
+        --with-http_stub_status_module  \
+        --with-http_auth_request_module \
+        --with-http_xslt_module=dynamic \
+        --with-http_image_filter_module=dynamic \
+        --with-http_geoip_module=dynamic    \
+        --with-threads \
+        --with-stream  \
+        --with-stream_ssl_module  \
+        --with-stream_ssl_preread_module \
+        --with-stream_realip_module \
+        --with-stream_geoip_module=dynamic  \
+        --with-http_slice_module \
+        --with-mail \
+        --with-mail_ssl_module \
+        --with-compat  \
+        --with-file-aio \
+        --with-http_geoip_module \
+        --with-http_v2_module \
+        --add-module=modules/ngx_http_upstream_check_module \
+        --add-module=modules/headers-more-nginx-module-0.33  \
+        --add-module=modules/ngx_http_upstream_session_sticky_module \
+        --add-module=modules/ngx_http_upstream_dynamic_module
+  args:
+    chdir: /tmp/tengine
+
+- name:  TENGINE | Make
+  shell: make -j2
+  args:
+    chdir: /tmp/tengine
+
+- name: TENGINE | Make install
+  shell: make install
+  args:
+    chdir: /tmp/tengine
+
+- name: TENGINE | Upload service nginx system.d
+  copy: src=tengine-config/nginx.service dest=/lib/systemd/system/nginx.service
+
+- name: TENGINE |  Enable service tengine "nginx", and not touch the state
+  ansible.builtin.service:
+    name: nginx
+    enabled: yes

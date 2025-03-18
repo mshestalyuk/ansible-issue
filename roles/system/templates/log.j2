@@ -1,0 +1,21 @@
+/var/www/httpd-logs/*.log
+{
+    # Ежедневная ротация.
+    daily
+    # Отсутствие файла не является ошибкой.
+    missingok
+    # Не более 30 логов, т.к. ротация ежедневная, то это история за 30 дней.
+    rotate 30
+    # Ротируемые файлы сжимаются.
+    compress
+    # Сжимать предыдущий файл при следующей ротации.
+    delaycompress
+    # Не обрабатывать пустые файлы.
+    notifempty
+    # После ротации создать пустой файл с заданными правами и пользователем.
+    create 640 www-data root
+    sharedscripts
+    postrotate
+        [ -f /var/run/nginx.pid ] && kill -USR1 `cat /var/run/nginx.pid`
+    endscript
+}

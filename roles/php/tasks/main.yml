@@ -1,0 +1,61 @@
+- name: PHP7.4 | Install apts
+  apt:
+    name: "{{ packages }}"
+  vars:
+    packages:
+    - memcached
+    - imagemagick
+    - php7.4-cli
+    - php7.4-fpm
+    - php7.4-readline
+    - php7.4-redis
+    - php7.4-pgsql
+    - php7.4-dom
+    - php7.4-curl
+    - php7.4-memcached
+    - php7.4-ldap
+    - php7.4-opcache
+    - php7.4-common
+    - php7.4-json
+    - php7.4-readline
+    - php7.4-mysql
+    - php7.4-mbstring
+    - php7.4-cgi
+    - php7.4-intl
+    - php7.4-pspell
+    - php7.4-xmlrpc
+    - php7.4-gd
+    - php7.4-memcache
+    - php7.4-xml
+    - php7.4-imagick
+    - php7.4-tidy
+    - php7.4-zip
+    - php-sqlite3
+
+- name: PHP7.4 | Copy php.ini config
+  copy: src=files/php.ini dest=/etc/php/7.4/fpm/php.ini force=yes
+
+- name: PHP7.4 | Copy www.conf for user config
+  template: src=templates/www.conf.j2 dest=/etc/php/7.4/fpm/pool.d/{{ item.user_name }}.conf force=yes
+  with_items: "{{ project_users }}"
+  register: slack_php_change
+
+- name: PHP | Create php temporary dir
+  file:
+    path: /var/www/{{ item.user_name }}/data/mod-tmp
+    state: directory
+    owner: "{{ item.user_name }}"
+    group: www-data
+    mode: 0755
+  with_items: "{{ project_users }}"
+
+- name: PHP | Create php directory
+  file:
+    path: /var/www/php-fpm/
+    state: directory
+    owner: root
+    group: www-data
+    mode: 0755
+
+- name: PHP | restart PHP7.4-fpm
+  service: name=php7.4-fpm state=restarted

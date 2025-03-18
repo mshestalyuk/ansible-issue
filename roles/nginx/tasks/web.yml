@@ -1,0 +1,121 @@
+- name: Starting DI Proces (NGINX)
+  block:
+    - name: Nginx | Copy nginx.conf
+      copy: src=web-config/nginx.conf dest=/etc/nginx/nginx.conf force=yes
+
+    - name: Nginx | Copy fastcgi_params
+      copy: src=web-config/fastcgi_params dest=/etc/nginx/fastcgi_params force=yes
+
+    - name: Nginx | Copy allow.conf
+      copy: src=web-config/allow.conf dest=/etc/nginx/allow.conf
+
+    - name: Nginx | Copy static.conf
+      copy: src=web-config/static.conf dest=/etc/nginx/static.conf force=yes
+
+    - name: Nginx | Copy bad_agent.conf
+      copy: src=web-config/bad_agent.conf dest=/etc/nginx/bad_agent.conf force=yes
+
+    - name: Nginx | Copy static.conf
+      copy: src=web-config/goo_yan_map.conf dest=/etc/nginx/goo_yan_map.conf force=yes
+
+    - name: Nginx | Remove dafualt host
+      file: path=/etc/nginx/sites-enabled/default state=absent
+
+    - name: Nginx | Remove dafualt host
+      file: path=/etc/nginx/vhosts state=absent
+
+    - name: Nginx | Remove file /etc/nginx/vhosts-includes/real-ip.conf
+      file:
+        path: /etc/nginx/vhosts-includes/real-ip.conf
+        state: absent
+
+    - name: Nginx | Create catalogue for test user
+      file:
+        path: /var/www/httpd-cert/no_php_not_found/
+        state: directory
+        mode: 0755
+
+    - name: Nginx | Copy default cert
+      copy: src=files/ssl/test.local.crt dest=/var/www/httpd-cert/no_php_not_found/test.local.crt force=true
+      become: true
+
+    - name: Nginx | Copy default key
+      copy: src=files/ssl/test.local.key dest=/var/www/httpd-cert/no_php_not_found/test.local.key force=true
+      become: true
+
+    - name: Nginx | Copy GeoIP.dat
+      copy: src=web-config/GeoIP.dat dest=/etc/nginx/GeoIP.dat force=yes
+
+    - name: Nginx | Create nginx directories for project hosts
+      file:
+        path: /etc/nginx/vhosts/{{ item.user_name }}
+        state: directory
+        mode: 0755
+      with_items: "{{ project_users }}"
+
+    - name: Nginx | Copy default config
+      template: src=templates/default.conf.j2 dest=/etc/nginx/default.conf
+
+    - name: Nginx | Creating aditional directory
+      file:
+        path: /etc/nginx/vhosts-resources/{{ item.user_name }}
+        state: directory
+        mode: 0755
+      with_items: "{{ project_users }}"
+
+    - name: Nginx | Creating aditional directory vhosts-includes
+      file:
+        path: /etc/nginx/vhosts-includes/
+        state: directory
+        mode: 0755
+
+    - name: Nginx | Create rewrites directory
+      file:
+        path: "{{ item.rootdir }}/rewrites"
+        state: directory
+        mode: 0755
+      with_items: "{{ project_users }}"
+      when: item.project_rewrites is defined and item.project_rewrites
+
+    - name: Nginx | Create rewrite files
+      file:
+        path: "{{ item.rootdir }}/rewrites/{{ item.user_name }}.conf"
+        state: touch
+        mode: 0644
+      with_items: "{{ project_users }}"
+      when: item.project_rewrites is defined and item.project_rewrites
+
+    - name: Nginx | Create directory for logs
+      file:
+        path: /var/www/httpd-logs/
+        state: directory
+        mode: 0755
+
+    - name: Nginx | Copy vhosts-incudes configs
+      copy: src={{ item }} dest=/etc/nginx/vhosts-includes/ force=true
+      with_fileglob:
+      - "vhosts-includes/*"
+
+    - name: Nginx | Create vhost config
+      template: src=templates/vhost.conf.j2 dest=/etc/nginx/vhosts/{{ item.user_name }}/{{ item.domain.name }}.conf
+      with_items: "{{ project_users }}"
+
+    - name: Nginx | Test nginx config
+      shell: nginx -t
+
+    - name: Nginx | Restart nginx
+      service:
+        name: nginx
+        state: restarted
+
+    - name: Nginx | Make sure that nginx is running
+      service:
+        name: nginx
+        state: started
+        enabled: yes
+
+  rescue:
+
+    - name: Ошибка в роле nginx
+      ansible.builtin.debug:
+        msg: '{{ ansible_failed_result | to_nice_json }}'

@@ -1,0 +1,32 @@
+server {
+        server_name _;
+        charset UTF-8;
+        disable_symlinks if_not_owner from=$root_path;
+        index index.php;
+        root $root_path;
+        set $root_path /var/www/no_php_not_found/data/www/test.local;
+        access_log /var/www/httpd-logs/test.local.access.log ;
+        error_log /var/www/httpd-logs/test.local.error.log notice;
+        include /etc/nginx/vhosts-includes/*.conf;
+        location / {
+        }
+        listen {{ ansible_default_ipv4.address }}:80  default_server;
+        listen [::]:80  default_server;
+}
+server {
+        server_name _;
+        charset UTF-8;
+        disable_symlinks if_not_owner from=$root_path;
+        index index.php;
+        root $root_path;
+        set $root_path /var/www/no_php_not_found/data/www/test.local;
+        access_log /var/www/httpd-logs/test.local.access.log ;
+        error_log /var/www/httpd-logs/test.local.error.log notice;
+        include /etc/nginx/vhosts-includes/*.conf;
+        location / {
+        }
+        listen {{ ansible_default_ipv4.address }}:443   ssl http2 default_server;
+        listen [::]:443   ssl http2 default_server;
+        ssl_certificate "/var/www/httpd-cert/no_php_not_found/test.local.crt";
+        ssl_certificate_key "/var/www/httpd-cert/no_php_not_found/test.local.key";
+}

@@ -1,0 +1,21 @@
+- name: Check if project dir Tengine was available
+  ansible.builtin.stat:
+    path: "/etc/nginx"
+  register: tengine
+
+- name: Include  tengine
+  ansible.builtin.import_tasks:
+    file: tengine.yml
+  when: not tengine.stat.exists
+
+- name: Debug ansible_default_ipv4.address
+  ansible.builtin.debug:
+    var: ansible_default_ipv4.address
+
+- name: Debug ansible_default_ipv6.address
+  ansible.builtin.debug:
+    var: ansible_default_ipv6.address
+
+- name: Include  web
+  ansible.builtin.import_tasks:
+    file: web.yml

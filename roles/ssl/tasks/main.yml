@@ -1,0 +1,132 @@
+- name: Starting DI Proces (SSL)
+  block:
+
+    - name: SSL | Install a .deb package from the internet.
+      apt:
+        deb: https://github.com/smallstep/cli/releases/download/v0.15.16/step-cli_0.15.16_amd64.deb
+      ignore_errors: yes
+
+    - name: SSL | Create catalogue for CA TLS
+      file:
+        path: /etc/tls
+        state: directory
+        mode: 0755
+
+    - name: SSL | Copy CA key
+      copy: src=intermediate_ca.key dest=/etc/tls/intermediate_ca.key force=true
+      become: true
+
+    - name: SSL | Copy CA crt
+      copy: src=intermediate_ca.crt dest=/etc/tls/intermediate_ca.crt force=true
+      become: true
+
+    - name: SSL | Copy CA tpl
+      copy: src=csr.tpl dest=/etc/tls/csr.tpl force=true
+      become: true
+
+    - name: SSL | Create catalogue for project certs
+      file:
+        path: /var/www/httpd-cert/{{ item.user_name }}/
+        state: directory
+        mode: 0755
+      with_items: "{{ project_users }}"
+      become: true
+
+    - name: SSL | Generate selfsigned certificates for main domain
+      command: >
+        step certificate create {{ item.domain.name }} {{ item.domain.name }}.crt {{ item.domain.name }}.key --template /etc/tls/csr.tpl --not-after=8760h --kty RSA --size 2048 --ca /etc/tls/intermediate_ca.crt --ca-key /etc/tls/intermediate_ca.key  --bundle --insecure --no-password --force
+      become: true
+      with_items: "{{ project_users }}"
+
+    - name: SSL | Move main domain certificates to directory
+      command: mv "{{ item.domain.name }}".crt "{{ item.user_ssl_dir }}"/"{{ item.domain.name }}".crt
+      with_items: "{{ project_users }}"
+
+    - name: SSL | move main domain certificates to directory
+      command: mv "{{ item.domain.name }}".key "{{ item.user_ssl_dir }}"/"{{ item.domain.name }}".key
+      with_items: "{{ project_users }}"
+
+    - name: SSL | Generate selfsigned certificates for secondary domains
+      command: >
+        step certificate create {{ item.1 }} {{ item.1 }}.crt {{ item.1 }}.key --template /etc/tls/csr.tpl  --not-after=8760h  --kty RSA --size 2048 --ca /etc/tls/intermediate_ca.crt --ca-key /etc/tls/intermediate_ca.key --bundle --insecure --no-password --force
+      become: true
+      with_subelements:
+        - "{{ project_users }}"
+        - secondary_domains
+        - skip_missing: yes
+      when: item.1 is defined
+
+    - name: SSL | Move certificates to directory
+      command: mv "{{ item.1 }}".crt "{{ item.0.user_ssl_dir }}"/"{{ item.1 }}".crt
+      with_subelements:
+        - "{{ project_users }}"
+        - secondary_domains
+        - skip_missing: yes
+      when: item.1 is defined
+
+    - name: SSL | move certificates to directory
+      command: mv "{{ item.1 }}".key "{{ item.0.user_ssl_dir }}"/"{{ item.1 }}".key
+      with_subelements:
+        - "{{ project_users }}"
+        - secondary_domains
+        - skip_missing: yes
+      when: item.1 is defined
+
+    - name: SSL | Generate selfsigned certificates for additional domains
+      command: >
+        step certificate create {{ item.1 }} {{ item.1 }}.crt {{ item.1 }}.key --template /etc/tls/csr.tpl  --not-after=8760h --kty RSA --size 2048 --ca /etc/tls/intermediate_ca.crt --ca-key /etc/tls/intermediate_ca.key  --bundle --insecure --no-password --force
+      become: true
+      with_subelements:
+        - "{{ project_users }}"
+        - baned.ssl_rewrite.names
+        - skip_missing: yes
+      when: item.1 is defined
+
+    - name: SSL | Move certificates to directory
+      command: mv "{{ item.1 }}".crt "{{ item.0.user_ssl_dir }}"/"{{ item.1 }}".crt
+      with_subelements:
+        - "{{ project_users }}"
+        - baned.ssl_rewrite.names
+        - skip_missing: yes
+      when: item.1 is defined
+
+    - name: SSL | move certificates to directory
+      command: mv "{{ item.1 }}".key "{{ item.0.user_ssl_dir }}"/"{{ item.1 }}".key
+      with_subelements:
+        - "{{ project_users }}"
+        - baned.ssl_rewrite.names
+        - skip_missing: yes
+      when: item.1 is defined
+
+    - name: SSL | Generate selfsigned certificates for additional domains
+      command: >
+        step certificate create {{ item.1 }} {{ item.1 }}.crt {{ item.1 }}.key --template /etc/tls/csr.tpl  --not-after=8760h --kty RSA --size 2048 --ca /etc/tls/intermediate_ca.crt --ca-key /etc/tls/intermediate_ca.key --bundle --insecure --no-password --force
+      become: true
+      with_subelements:
+        - "{{ project_users }}"
+        - aliases
+        - skip_missing: yes
+      when: item.1 is defined
+
+    - name: SSL | Move certificates to directory
+      command: mv "{{ item.1 }}".crt "{{ item.0.user_ssl_dir }}"/"{{ item.1 }}".crt
+      with_subelements:
+        - "{{ project_users }}"
+        - aliases
+        - skip_missing: yes
+      when: item.1 is defined
+
+    - name: SSL | move certificates to directory
+      command: mv "{{ item.1 }}".key "{{ item.0.user_ssl_dir }}"/"{{ item.1 }}".key
+      with_subelements:
+        - "{{ project_users }}"
+        - aliases
+        - skip_missing: yes
+      when: item.1 is defined
+
+
+  rescue:
+
+    - name:  Ошибка в роле SSL
+      ansible.builtin.debug:
+        msg: '{{ ansible_failed_result | to_nice_json }}'

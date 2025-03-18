@@ -1,0 +1,11 @@
+mysql_root_password: "YwASChllGM9NtWVAtftwog"
+
+mysql_version_major: "5"
+mysql_version_minor: "{% if ansible_distribution == 'Ubuntu' and ansible_distribution_major_version|int >=20 %}7{% else %}6{% endif %}"
+mysql_version: "{{ mysql_version_major|int }}.{{ mysql_version_minor|int }}"
+
+mysql_datadir: "/var/lib/mysql"
+
+#### clon of root (super user) access
+super_usname: mysql_suuser
+super_uspass: "s6xAVijUssSTbTP2pz"

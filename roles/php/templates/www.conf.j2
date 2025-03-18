@@ -1,0 +1,21 @@
+[{{ item.user_name }}]
+pm = dynamic
+pm.start_servers = 5
+pm.min_spare_servers = 5
+pm.max_children = 10
+pm.max_spare_servers = 10
+;php_admin_value[display_errors] = stderr
+php_admin_value[log_errors] = On
+listen = /var/www/php-fpm/{{ item.user_name }}.sock
+listen.mode = 0660
+listen.owner = {{ item.user_name }}
+listen.group = www-data
+user = {{ item.user_name }}
+group = {{ item.user_name }}
+chdir = /
+php_admin_value[upload_tmp_dir] = /var/www/{{ item.user_name }}/data/mod-tmp
+php_admin_value[session.save_path] = /var/www/{{ item.user_name }}/data/mod-tmp
+pm.process_idle_timeout = 20s
+pm.max_requests = 500
+request_terminate_timeout = 30s
+php_admin_value[memory_limit] = 128M

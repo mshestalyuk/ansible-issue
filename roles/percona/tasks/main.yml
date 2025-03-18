@@ -1,0 +1,18 @@
+- name:  Percona MySQL-DB | Check if project Database directory exists
+  ansible.builtin.include_tasks: 
+    file: check_database.yml
+
+- name: Percona MySQL-DB | Remove all anonymous user accounts
+  mysql_user:
+    name: ''
+    host_all: yes
+    state: absent
+    login_user: "{{ super_usname }}"
+    login_password: "{{ super_uspass }}"
+
+- name: Percona MySQL-DB | Remove the MySQL test database
+  mysql_db:
+    name: test
+    state: absent
+    login_user: "{{ super_usname }}"
+    login_password: "{{ super_uspass }}"

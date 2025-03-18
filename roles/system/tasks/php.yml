@@ -1,0 +1,9 @@
+- name: PHP | Copy systemd  php7.4-fpm.service
+  copy:
+     src:  files/php7.4-fpm.service
+     dest: /lib/systemd/system/php7.4-fpm.service
+     owner: root
+     group: root
+     mode: 0644
+  notify:
+    - restart systemd

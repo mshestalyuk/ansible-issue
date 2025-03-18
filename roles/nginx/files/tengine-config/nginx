@@ -1,0 +1,19 @@
+Package: nginx-light
+Pin: release o=Ubuntu
+Pin-Priority: -1
+
+Package: nginx-extras
+Pin: release o=Ubuntu
+Pin-Priority: -1
+
+Package: nginx-common
+Pin: release o=Ubuntu
+Pin-Priority: -1
+
+Package: nginx
+Pin: release o=Ubuntu
+Pin-Priority: -1
+
+Package: nginx-full
+Pin: release o=Ubuntu
+Pin-Priority: -1

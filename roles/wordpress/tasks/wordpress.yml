@@ -1,0 +1,90 @@
+- name: Starting DI Proces (Wordpress)
+  block:
+
+    - name: WordPress | Copy 5.9.3.tar.gz version
+      copy:
+        src: wordpress-5.9.3.tar.gz
+        dest: /tmp/wordpress-5.9.3.tar.gz
+
+    - name: Unpack latest WordPress
+      unarchive:
+        src: "/tmp/wordpress-5.9.3.tar.gz"
+        dest: "{{ item.rootdir }}"
+        remote_src: yes
+        extra_opts:
+          - --strip-components=1
+
+    - name: Wordpress | Copy wp-config
+      template:
+        src: templates/wp-config-sample.php.j2
+        dest: "{{ item.rootdir }}/wp-config.php"
+        force: yes
+
+    - name: "Install ansible python3 mysql dependency"
+      apt:
+        name: python3-mysqldb
+        state: latest
+
+    - name: Create a new database with name "{{ item.wordpress.db_name }}"
+      mysql_db:
+        name: "{{ item.wordpress.db_name }}"
+        state: present
+        login_user: "{{ super_usname }}"
+        login_password: "{{ super_uspass }}"
+
+
+    - name: Create wordpress database users
+      mysql_user:
+        name: "{{ item.wordpress.db_user }}"
+        password: "{{ item.wordpress.db_user_pass }}"
+        host: "%"
+        priv: "{{ item.wordpress.db_name }}.*:ALL"
+        state: "present"
+        login_user: "{{ super_usname }}"
+        login_password: "{{ super_uspass }}"
+
+
+    - name: Set ownership
+      file:
+        path: "{{ item.rootdir }}"
+        state: "directory"
+        owner: "{{ item.user_name }}"
+        group: "www-data"
+        recurse: yes
+
+    - name: Wordpress | Copy randomly robots.txt
+      template:
+        src: templates/robots9.txt.j2
+        dest: "{{ item.rootdir }}/robots.txt"
+        owner: "{{ item.user_name }}"
+        group: www-data
+        force: no
+
+    - name: Wordpress | Copy robots_mirror
+      template:
+        src: templates/robots_mirrors.txt.j2
+        dest: "{{ item.rootdir }}/robots/robots_mirrors.txt"
+        owner: "{{ item.user_name }}"
+        group: www-data
+        force: no
+
+    - name: Wordpress | Copy robots.php
+      template:
+        src: templates/robots.php.j2
+        dest: "{{ item.rootdir }}/robots.php"
+        owner: "{{ item.user_name }}"
+        group: www-data
+        force: no
+
+    - name: Set permissions for directories
+      shell: "/usr/bin/find /var/www/{{ item.user_name }}/data/www/ -type d -exec chmod 775 {} \\;"
+
+    - name: Set permissions for files
+      shell: "/usr/bin/find /var/www/{{ item.user_name }}/data/www/ -type f -exec chmod 660 {} \\;"
+
+
+  rescue:
+
+    - name: Ошибка в роле users
+      ansible.builtin.debug:
+        msg: '{{ ansible_failed_result | to_nice_json }}'

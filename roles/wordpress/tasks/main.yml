@@ -1,0 +1,36 @@
+- name: Starting DI Proces (Wordpress)
+  block:
+
+    - name: Wordpress | Creating directory for project
+      ansible.builtin.file:
+        path: "{{ item.rootdir }}"
+        state: "directory"
+        owner: "{{ item.user_name }}"
+        group: "www-data"
+        mode: "0755"
+        force: "no"
+      with_items:
+        - "{{ project_users }}"
+
+    - name: Wordpress | Creating directory robots
+      ansible.builtin.file:
+        path: "{{ item.rootdir }}/robots"
+        state: "directory"
+        owner: "{{ item.user_name }}"
+        group: "www-data"
+        mode: "0755"
+        force: "no"
+      with_items:
+        - "{{ project_users }}"
+
+    - name: Wordpress | include check-dir-wp-admin.yml
+      ansible.builtin.include_tasks: check-dir-wp-admin.yml
+      with_items:
+        - "{{ project_users }}"
+      when: item.wordpress is defined and item.wordpress.db_name  != 'noconfig'
+
+  rescue:
+
+    - name:  Ошибка в роле wordpress
+      ansible.builtin.debug:
+        msg: '{{ ansible_failed_result | to_nice_json }}'

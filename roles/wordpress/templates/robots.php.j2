@@ -1,0 +1,14 @@
+<?php
+//var_dump($_SERVER); die;
+$url = $_SERVER['HTTP_HOST'];
+//$robotsfile = "robots/robots".(strpos($_SERVER['HTTP_HOST'],"{{ item.domain.name }}") === true ? "" : "2").".txt";
+$robotsfile1 = "robots.txt";
+$robotsfile2 = "robots/robots_mirrors.txt";
+header("Content-Type: text/plain; utf-8");
+if ($url == "{{ item.domain.name }}") {
+	echo file_get_contents($robotsfile1);
+}
+else {
+	echo file_get_contents($robotsfile2);
+}
+//var_dump($_SERVER);

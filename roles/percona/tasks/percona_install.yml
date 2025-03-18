@@ -1,0 +1,109 @@
+- name: Install PERCONA | "Install gnupg"
+  apt:
+    name: gnupg2
+    update_cache: yes
+
+- name: Install PERCONA | "Install percona-release package"
+  ansible.builtin.apt:
+    deb: "https://repo.percona.com/apt/percona-release_latest.{{ ansible_distribution_release }}_all.deb"
+
+- name: Install PERCONA | "Enable Percona repository (Percona version <= 8)"
+  command: "percona-release setup ps{{ mysql_version_major }}{{ mysql_version_minor }}"
+  when: mysql_version_major|int <= 8
+  changed_when: False
+
+- name: Install PERCONA | "Install python-is-python3 (Ubuntu >= Focal/20.04)"
+  apt:
+    name: "python-is-python3"
+- debug:
+    msg: "ansible_python_interpreter major version: {{ ansible_python.version.major }}"
+
+- name: Install PERCONA | "Install package dependencies for ansible MySQL modules (python 2)"
+  apt:
+    name: "python-mysqldb"
+  when:
+    - ansible_python.version.major == 2
+
+- name: Install PERCONA | "Install package dependencies for ansible MySQL modules (python 3)"
+  apt:
+    name:
+      - "python3-pymysql"
+      - "python3-mysqldb"
+      - "python3-passlib"
+  when:
+    - ansible_python.version.major == 3
+
+- name: Install PERCONA | "Install percona packages and dependencies on Ubuntu (Percona version < 8)"
+  apt:
+    name:
+      - "percona-server-server-{{ mysql_version_major }}.{{ mysql_version_minor }}"
+      - "percona-server-client-{{ mysql_version_major }}.{{ mysql_version_minor }}"
+      - "percona-toolkit"
+    update_cache: yes
+    state: "present"
+  when: mysql_version_major|int < 8
+
+- name: Install PERCONA | "Install | configure debconf for version 8.0 (Use Legacy Authentication Method)"
+  debconf:
+    name: 'percona-server-server'
+    question: 'percona-server-server/default-auth-override'
+    value: 'Use Legacy Authentication Method (Retain MySQL 5.x Compatibility)'
+    vtype: select
+  changed_when: false
+  when:
+    - mysql_version_major|int >= 8
+    - mysql_default_authentication_plugin is defined
+    - mysql_default_authentication_plugin == "mysql_native_password"
+
+- name: Install PERCONA | "Install percona packages and dependencies on Ubuntu (Percona version >= 8)"
+  apt:
+    name:
+      - "percona-server-server={{ mysql_version_major }}.{{ mysql_version_minor }}*"
+      - "percona-server-client={{ mysql_version_major }}.{{ mysql_version_minor }}*"
+      - "percona-toolkit"
+    state: "present"
+    update_cache: yes
+  when: mysql_version_major|int >= 8
+
+- name: Install PERCONA | "Adjust permissions of datadir"
+  file:
+    path: "{{ mysql_datadir }}"
+    owner: "mysql"
+    group: "mysql"
+    mode: 0700
+    state: "directory"
+
+- name: Install PERCONA | "Set the root password"
+  mysql_user:
+    name: root
+    host: "{{ item }}"
+    password: "{{ mysql_root_password }}"
+    check_implicit_admin: yes
+    state: present
+    login_unix_socket: "{% if ansible_os_family == 'RedHat' %}/var/lib/mysql/mysql.sock{% else %}/var/run/mysqld/mysqld.sock{% endif %}"
+  with_items:
+    - "{{ ansible_hostname }}"
+    - "127.0.0.1"
+    - "::1"
+    - "localhost"
+
+- name: Install PERCONA | Create another super user
+  mysql_user:
+    name: "{{ super_usname }}"
+    password: "{{ super_uspass }}"
+    host: "%"
+    priv: "*.*:ALL,GRANT"
+    state: "present"
+    login_user: root
+    login_password: "{{ mysql_root_password }}"
+    login_host: localhost
+
+- name: Install PERCONA | set network access for super user
+  mysql_user:
+    name: "{{ super_usname }}"
+    host: "%"
+    password: "{{ super_uspass }}"
+    check_implicit_admin: yes
+    state: present
+    login_user: root
+    login_password: "{{ mysql_root_password }}"

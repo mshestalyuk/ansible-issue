@@ -1,0 +1,347 @@
+{% if item.phpredirect is defined and item.phpredirect == true %}
+  {% if item.domain.www_redirect is defined and item.domain.www_simple == true %}
+      {% for www_redirect in item.domain.www_redirect %}
+server {
+        server_name {{ www_redirect }};
+        listen {{ ansible_default_ipv4.address }}:80;
+        listen [::]:80;
+        {% if item.domain.ssl == true %}
+        listen {{ ansible_default_ipv4.address }}:443 ssl http2;
+        listen [::]:443 ssl http2;
+        {% endif %}
+        location / {
+          return 301 $scheme://{{ www_redirect|replace("www.", "") }}$request_uri;
+        }
+        {% if item.domain.ssl == true %}
+        ssl_certificate "/var/www/httpd-cert/{{ item.user_name }}/{{ item.domain.name }}.crt";
+        ssl_certificate_key "/var/www/httpd-cert/{{ item.user_name }}/{{ item.domain.name }}.key";
+        # Mozilla Old configuration
+        ssl_protocols             TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;
+        ssl_ciphers               ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES256-SHA256:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA;
+        ssl_prefer_server_ciphers on;
+        {% endif %}
+}
+      {% endfor %}
+  {% endif %}
+
+server {
+  {% if item.aliases is defined %}
+        server_name {{ item.domain.name }} {{ item.aliases|join(" ") }};
+    {% else %}
+        server_name {{ item.domain.name }};
+  {% endif %}
+        charset UTF-8;
+        disable_symlinks if_not_owner from=$root_path;
+        index index.php index.html;
+        root $root_path;
+        {% if item.cmsdata is defined %}
+                set $root_path {{ item.rootdir }}/public;
+        {% else %}
+                set $root_path {{ item.rootdir }};
+        {% endif %}
+        access_log /var/www/httpd-logs/{{ item.domain.name }}.access.log main;
+        error_log /var/www/httpd-logs/{{ item.domain.name }}.error.log notice;
+  {% if item.statictoindex is defined and item.statictoindex == true %} 
+        include /etc/nginx/vhosts-includes/*.conf;
+    {% else %}
+        include /etc/nginx/vhosts-includes/*.conf;
+        include /etc/nginx/static.conf;
+  {% endif %}
+  {% if item.project_rewrites == true %}
+        include {{ item.rootdir }}/rewrites/{{ item.user_name }}.conf;
+  {% endif %}
+  {% if item.sitemap_last is defined and item.sitemap_last == true %}
+        location /sitemap.xml {
+                rewrite ^\/sitemap\.xml /sitemap.php?path=$1 last;
+        }
+  {% endif %}
+
+                sub_filter_types *;
+                sub_filter ".seosf.tech" "";
+                sub_filter "yandex-removed" "mc.yandex.ru";
+                sub_filter_once off;
+
+        server_tokens off;
+
+        if ($http_x_direct_request = 1){
+            return 200 'ok';
+        }
+
+        include /etc/nginx/vhosts-includes/{{ item.domain.name }}*;
+
+  {% if item.rkn_blacklist_disabled == true %}
+        include /etc/nginx/vhosts-includes/rkn-blacklist.conf;
+  {% endif %}
+        location ~ iseedeadpeople86438816e6e562e969f$ {
+           return 200 '{{ ansible_default_ipv4.address }}';
+           add_header Content-Type text/plain;
+        }
+        location / {
+  {% if item.alltoindex_php is defined and item.alltoindex_php == true %}
+                  try_files /does_not_exists /index.php?$args;
+    {% else %}
+                  try_files $uri $uri/ /index.php?$args;
+  {% endif%}
+                  rewrite ^\/robots\.txt /index.php?$args last;
+  {% if item.alltoindex_php is defined and item.alltoindex_php == true %}
+                location  /index.php {
+                        try_files /does_not_exists @php;
+                }
+    {% else %}
+                location ~ [^/]\.ph(p\d*|tml)$ {
+                        try_files /does_not_exists @php;
+                }
+  {% endif %}
+        }
+
+        location @php {
+                add_header Access-Control-Allow-Origin "*";
+                fastcgi_index index.php;
+
+                fastcgi_pass unix:/var/www/php-fpm/{{ item.user_name }}.sock;
+                fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                fastcgi_split_path_info ^((?U).+\.ph(?:p\d*|tml))(/?.+)$;
+                try_files $uri =404;
+                include fastcgi_params;
+        }
+
+        listen {{ ansible_default_ipv4.address }}:80;
+        listen [::]:80;
+        {% if item.domain.ssl == true %}
+        listen {{ ansible_default_ipv4.address }}:443 ssl http2;
+        listen [::]:443 ssl http2;
+        ssl_certificate "/var/www/httpd-cert/{{ item.user_name }}/{{ item.domain.name }}.crt";
+        ssl_certificate_key "/var/www/httpd-cert/{{ item.user_name }}/{{ item.domain.name }}.key";
+        # Mozilla Old configuration
+        ssl_protocols             TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;
+        ssl_ciphers               ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES256-SHA256:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA;
+        ssl_prefer_server_ciphers on;
+        {% endif %}
+}
+
+{% else %}
+
+{% if item.domain.www_simple is defined and item.domain.www_redirect is defined and not item.domain.ssl %}
+  {% for www_redirect in item.domain.www_redirect %}
+server {
+
+      {% if item.www_redirect_towww is defined and item.www_redirect_towww == true %}
+      server_name {{ www_redirect|replace("www.", "") }};
+          {% else %}
+      server_name {{ www_redirect }};
+      {% endif %}
+        listen {{ ansible_default_ipv4.address }}:80;
+        listen [::]:80;
+        location / {
+      {% if item.www_redirect_towww is defined and item.www_redirect_towww == true %}
+          rewrite ^ http://{{ www_redirect }}$uri permanent;
+            {% else %}
+          rewrite ^ http://{{ www_redirect|replace("www.", "") }}$uri permanent;
+      {% endif %}
+        }
+}
+  {% endfor %}
+{% endif %}
+
+{% if item.domain.ssl and item.domain.www_redirect is defined and item.domain.www_simple is defined %}
+  {% for www_redirect in item.domain.www_redirect %}
+server {
+        {% if item.www_redirect_towww is defined and item.www_redirect_towww == true %}
+        server_name {{ www_redirect|replace("www.", "") }};
+            {% else %}
+        server_name {{ www_redirect }};
+        {% endif %}
+        listen {{ ansible_default_ipv4.address }}:80;
+        listen [::]:80;
+        location / {
+        {% if item.www_redirect_towww is defined and item.www_redirect_towww == true %}
+          return 301 https://{{ www_redirect }}$request_uri;
+          {% else %}
+          return 301 https://{{ www_redirect|replace("www.", "") }}$request_uri;
+        {% endif %}
+        }
+}
+  {% endfor %}
+{% endif %}
+
+{% if item.domain.ssl == true and item.domain.www_redirect is defined %}
+  {% for www_redirect in item.domain.www_redirect %}
+server {
+        {% if item.www_redirect_towww is defined and item.www_redirect_towww == true %}
+        server_name {{ www_redirect|replace("www.", "") }};
+            {% else %}
+        server_name {{ www_redirect }};
+        {% endif %}
+        listen {{ ansible_default_ipv4.address }}:443 ssl http2;
+        listen [::]:443 ssl http2;
+        ssl_certificate "/var/www/httpd-cert/{{ item.user_name }}/{{ www_redirect|replace("www.", "") }}.crt";
+        ssl_certificate_key "/var/www/httpd-cert/{{ item.user_name }}/{{ www_redirect|replace("www.", "") }}.key";
+        # Mozilla Old configuration
+        ssl_protocols             TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;
+        ssl_ciphers               ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES256-SHA256:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA;
+        ssl_prefer_server_ciphers on;
+        {% if item.www_redirect_towww is defined and item.www_redirect_towww == true %}
+          return 301 https://{{ www_redirect }}$request_uri;
+          {% else %}
+          return 301 https://{{ www_redirect|replace("www.", "") }}$request_uri;
+        {% endif %}
+}
+  {% endfor %}
+{% endif %}
+
+{% if item.domain.ssl == true %}
+server {
+        {% if item.www_redirect_towww is defined and item.www_redirect_towww == true %}
+          {% if item.aliases is defined %}
+              server_name {{ item.domain.www_redirect|join(" ") }};
+            {% else %}
+              server_name www.{{ item.domain.name }};
+          {% endif %}
+        {% endif %}
+        {% if item.www_redirect_towww is defined and item.www_redirect_towww == false %}
+          {% if item.aliases is defined %}
+              server_name {{ item.domain.name }} {{ item.aliases|join(" ") }};
+            {% else %}
+              server_name {{ item.domain.name }};
+          {% endif %}
+        {% endif %}
+        listen {{ ansible_default_ipv4.address }}:80;
+        listen [::]:80;
+        location / {
+        {% if item.www_redirect_towww is defined and item.www_redirect_towww == true %}
+          return 301 https://www.$host$request_uri;
+          {% else %}
+          return 301 https://$host$request_uri;
+        {% endif %}
+        }
+}
+{% endif %}
+
+server {
+  {% if item.www_redirect_towww is defined and item.www_redirect_towww == true %}
+    {% if item.aliases is defined %}
+        server_name {{ item.domain.www_redirect|join(" ") }};
+      {% else %}
+        server_name www.{{ item.domain.name }};
+    {% endif %}
+  {% endif %}
+  {% if item.www_redirect_towww is defined and item.www_redirect_towww == false %}
+    {% if item.aliases is defined %}
+        server_name {{ item.domain.name }} {{ item.aliases|join(" ") }};
+      {% else %}
+        server_name {{ item.domain.name }};
+    {% endif %}
+  {% endif %}
+        charset UTF-8;
+        disable_symlinks if_not_owner from=$root_path;
+        index index.php index.html;
+        root $root_path;
+{% if item.cmsdata is defined %}
+        set $root_path {{ item.rootdir }}/public;
+{% else %}
+        set $root_path {{ item.rootdir }};
+{% endif %}
+        access_log /var/www/httpd-logs/{{ item.domain.name }}.access.log main;
+        error_log /var/www/httpd-logs/{{ item.domain.name }}.error.log notice;
+{% if item.statictoindex is defined and item.statictoindex == true %}
+        include /etc/nginx/vhosts-includes/*.conf;
+{% else %}
+        include /etc/nginx/vhosts-includes/*.conf;
+        include /etc/nginx/static.conf;
+{% endif %}
+{% if item.project_rewrites is defined and item.project_rewrites %}
+        include {{ item.rootdir }}/rewrites/{{ item.user_name }}.conf;
+{% endif %}
+{% if item.sitemap_last is defined and item.sitemap_last == true %}
+        location /sitemap.xml {
+                rewrite ^\/sitemap\.xml /sitemap.php?path=$1 last;
+        }
+{% endif %}
+
+{% if item.robots_last is defined and item.robots_last == true %}
+        location /robots.txt {
+{% if item.cmsdata is not defined %}
+                rewrite ^\/robots\.txt /robots.php?path=$1 last;
+{% endif%}
+                add_header Content-Type text/plain;
+        }
+{% endif %}
+
+{% if item.nginxauth is defined and item.nginxauth %}
+        auth_basic "Login";
+{% endif %}
+                sub_filter_types *;
+                sub_filter ".seosf.tech" "";
+                sub_filter "yandex-removed" "mc.yandex.ru";
+                sub_filter_once off;
+
+        server_tokens off;
+
+        if ($http_x_direct_request = 1){
+            return 200 'ok';
+        }
+
+        include /etc/nginx/vhosts-includes/{{ item.domain.name }}*;
+
+{% if item.rkn_blacklist_disabled is not defined or item.rkn_blacklist_disabled is sameas false %}
+        include /etc/nginx/vhosts-includes/rkn-blacklist.conf;
+{% endif %}
+
+location ~ iseedeadpeople86438816e6e562e969f$ {
+  return 200 '{{ ansible_default_ipv4.address }}';
+  add_header Content-Type text/plain;
+}
+
+
+        location / {
+{% if item.alltoindex_php is defined and item.alltoindex_php == true %}
+                try_files /does_not_exists /index.php?$args;
+{% else %}
+                try_files $uri $uri/ /index.php?$args;
+{% endif%}
+
+{% if item.cmsdata is not defined %}
+                rewrite ^\/robots\.txt /robots.php?path=$1 last;
+{% endif%}
+
+{% if item.alltoindex_php is defined and item.alltoindex_php == true %}
+                location  /index.php {
+                        try_files /does_not_exists @php;
+                }
+{% else %}
+                location ~ [^/]\.ph(p\d*|tml)$ {
+                        try_files /does_not_exists @php;
+                }
+{% endif %}
+        }
+
+        location @php {
+                add_header Access-Control-Allow-Origin "*";
+                fastcgi_index index.php;
+
+                fastcgi_pass unix:/var/www/php-fpm/{{ item.user_name }}.sock;
+                fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                fastcgi_split_path_info ^((?U).+\.ph(?:p\d*|tml))(/?.+)$;
+                try_files $uri =404;
+                include fastcgi_params;
+        }
+
+{% if item.domain.ssl == true %}
+        listen {{ ansible_default_ipv4.address }}:443 ssl http2;
+        listen [::]:443 ssl http2;
+{% else %}
+       listen {{ ansible_default_ipv4.address }}:80;
+       listen [::]:80;
+{% endif %}
+
+{% if item.domain.ssl == true %}
+
+        ssl_certificate "/var/www/httpd-cert/{{ item.user_name }}/{{ item.domain.name }}.crt";
+        ssl_certificate_key "/var/www/httpd-cert/{{ item.user_name }}/{{ item.domain.name }}.key";
+        # Mozilla Old configuration
+        ssl_protocols             TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;
+        ssl_ciphers               ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384:DHE-RSA-CHACHA20-POLY1305:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA:ECDHE-RSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES256-SHA256:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:DES-CBC3-SHA;
+        ssl_prefer_server_ciphers on;
+{% endif %}
+}
+{% endif %}

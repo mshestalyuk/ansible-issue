@@ -1,0 +1,9 @@
+- name: Wordpress | Check if project wordpress directory exists
+  stat:
+    path: "{{ item.rootdir }}/index.php"
+  register: wp_checker
+  
+- name: Wordpress | include wordpress.yml
+  ansible.builtin.import_tasks: 
+    file: wordpress.yml
+  when: not wp_checker.stat.exists

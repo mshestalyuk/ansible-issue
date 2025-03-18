@@ -1,0 +1,9 @@
+- name: Include OS-specific variables
+  ansible.builtin.import_tasks:
+    file: ubuntu_20_04.yml
+  when: (ansible_facts['distribution'] == "Ubuntu" and ansible_facts['distribution_version'] == "20.04")
+
+- name: Include php role
+  ansible.builtin.import_tasks:
+    file: php.yml
+  when: (ansible_facts['distribution'] == "Ubuntu" and ansible_facts['distribution_version'] == "20.04")

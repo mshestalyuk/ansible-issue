@@ -1,0 +1,12 @@
+- hosts: wp-servers
+  remote_user: root
+  gather_facts: yes
+  become: true
+  roles:
+    - system
+    - percona
+    - users
+    - php
+    - wordpress
+    - ssl
+    - nginx

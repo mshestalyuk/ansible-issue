@@ -1,0 +1,9 @@
+- name: Percona CHECK | Check if project Database directory exists
+  ansible.builtin.stat:
+    path: "/etc/mysql/my.cnf"
+  register: db_checker
+
+- name: Percona CHECK | percona_install.yml
+  ansible.builtin.import_tasks:
+    file: percona_install.yml
+  when: not db_checker.stat.exists

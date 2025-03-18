@@ -1,0 +1,22 @@
+project_users:
+
+- user_name: user_1
+  user_password_open: "ejXvFGACSDF4ym"
+  user_shell: "/bin/bash"
+  user_home: /var/www/user_1/data/
+  user_ssl_dir: /var/www/httpd-cert/user_1
+  rootdir: /var/www/user_1/data/www/example.com
+  www_redirect_towww: false
+
+  domain:
+    name: example.com
+    ssl: true
+    www_simple: yes
+    www_redirect:
+      - www.example.com
+
+  wordpress:
+    db_name: "db_example_com"
+    db_user: "user_1"
+    db_user_pass: "ojIBsirheu75"
+    table_prefix: "sham_"
