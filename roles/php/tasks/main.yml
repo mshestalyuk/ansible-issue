@@ -1,3 +1,13 @@
+- name: Add PHP Repository
+  apt_repository:
+    repo: "ppa:ondrej/php"
+    state: present
+    update_cache: yes
+
+- name: Update apt cache
+  apt:
+    update_cache: yes
+
 - name: PHP7.4 | Install apts
   apt:
     name: "{{ packages }}"

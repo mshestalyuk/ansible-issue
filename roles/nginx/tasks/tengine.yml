@@ -89,7 +89,9 @@
     mode: "0644"
 
 - name: TENGINE | Configure
-  shell: ./configure \
+  shell: |
+    CFLAGS="-O -W -Wall -Wpointer-arith -Wno-unused-parameter -g"
+    ./configure \
         --prefix=/etc/nginx \
         --sbin-path=/usr/sbin/nginx \
         --modules-path=/usr/lib/nginx/modules \
@@ -138,6 +140,10 @@
         --add-module=modules/headers-more-nginx-module-0.33  \
         --add-module=modules/ngx_http_upstream_session_sticky_module \
         --add-module=modules/ngx_http_upstream_dynamic_module
+  environment:
+    CFLAGS: "-O -W -Wall -Wpointer-arith -Wno-unused-parameter -g"
+  args:
+    chdir: /tmp/tengine
   args:
     chdir: /tmp/tengine
 
